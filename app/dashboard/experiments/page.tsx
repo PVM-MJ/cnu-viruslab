@@ -91,8 +91,8 @@ export default function ResearchLogPage() {
       const data = await res.json()
       if (data.korean || data.english) setAiResult({ id: log.id, ...data })
       else alert('AI 오류: ' + (data.error ?? '알 수 없는 오류'))
-    } catch {
-      alert('AI 요청 중 오류가 발생했습니다')
+    } catch (err) {
+      alert('AI 오류: ' + (err instanceof Error ? err.message : '네트워크 오류'))
     } finally {
       setAiLoading(null)
     }

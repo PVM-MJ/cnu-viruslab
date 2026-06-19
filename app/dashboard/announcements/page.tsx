@@ -143,8 +143,8 @@ export default function AnnouncementsPage() {
       const data = await res.json()
       if (data.summary) setForm(f => ({ ...f, content: data.summary }))
       else alert('요약 실패: ' + (data.error ?? '알 수 없는 오류'))
-    } catch {
-      alert('요약 중 오류가 발생했습니다')
+    } catch (err) {
+      alert('요약 실패: ' + (err instanceof Error ? err.message : '네트워크 오류'))
     } finally {
       setSummarizing(false)
     }

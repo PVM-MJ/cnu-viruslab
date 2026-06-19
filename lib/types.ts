@@ -52,3 +52,16 @@ export interface Reagent {
   notes: string | null
   updated_at: string
 }
+
+export type ProtocolCategory = 'wet' | 'dry'
+
+export interface Protocol {
+  id: string
+  title: string
+  category: ProtocolCategory
+  subtitle: string | null
+  content: string
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}

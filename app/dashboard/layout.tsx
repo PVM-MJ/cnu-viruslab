@@ -15,6 +15,7 @@ const topNavItems = [
   { href: '/dashboard/announcements', label: '공지사항', icon: '📢' },
   { href: '/dashboard/meetings', label: '실험실 일정', icon: '📅' },
   { href: '/dashboard/experiments', label: '연구 일지', icon: '📓' },
+  { href: '/dashboard/research-notes', label: '연구 노트', icon: '🔬' },
 ]
 
 const bottomNavItems = [

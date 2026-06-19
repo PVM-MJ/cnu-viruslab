@@ -13,7 +13,7 @@ interface ResearchLog {
   created_at: string
 }
 
-const LAB_MEMBERS = ['광호', '예연', '지민', '나림', '민재', '주호']
+const LAB_MEMBERS = ['광호', '예연', '지민', '민재', '주호']
 const today = new Date().toISOString().split('T')[0]
 const EMPTY_FORM = { date: today, content: '', results: '', next_plan: '' }
 

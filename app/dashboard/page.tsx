@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
-const LAB_MEMBERS = ['광호', '예연', '지민', '나림', '민재', '주호']
+const LAB_MEMBERS = ['광호', '예연', '지민', '민재', '주호']
 
 export default function DashboardPage() {
   const [counts, setCounts] = useState({ meetings: 0, logs: 0, samples: 0, reagents: 0, needsOrder: 0 })

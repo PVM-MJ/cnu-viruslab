@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 interface LabEvent {
   id: string
   date: string
+  end_date: string | null
   title: string
   type: string
   description: string | null
@@ -27,31 +28,47 @@ const TYPE_COLOR: Record<string, { bg: string; text: string; dot: string }> = {
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토']
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
-const EMPTY_FORM = { title: '', type: '랩 미팅', description: '', time: '', participants: '', created_by: '' }
+const EMPTY_FORM = { title: '', type: '랩 미팅', description: '', time: '', end_date: '', participants: '', created_by: '' }
 
 export default function LabSchedulePage() {
   const now = new Date()
-  const [year, setYear]     = useState(now.getFullYear())
-  const [month, setMonth]   = useState(now.getMonth())
+  const [year, setYear]         = useState(now.getFullYear())
+  const [month, setMonth]       = useState(now.getMonth())
   const [selected, setSelected] = useState<string | null>(null)
-  const [events, setEvents] = useState<LabEvent[]>([])
+  const [events, setEvents]     = useState<LabEvent[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm]     = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
+  const [form, setForm]         = useState(EMPTY_FORM)
+  const [saving, setSaving]     = useState(false)
 
   const fetchEvents = useCallback(async () => {
     const mm = String(month + 1).padStart(2, '0')
     const lastDay = new Date(year, month + 1, 0).getDate()
+    const monthStart = `${year}-${mm}-01`
+    const monthEnd   = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`
+
+    // 이달에 걸치는 이벤트: 시작일 <= 월말 AND (종료일 >= 월초 OR 종료일 없음)
     const { data } = await supabase
       .from('lab_events')
       .select('*')
-      .gte('date', `${year}-${mm}-01`)
-      .lte('date', `${year}-${mm}-${lastDay}`)
+      .lte('date', monthEnd)
+      .or(`end_date.gte.${monthStart},end_date.is.null`)
       .order('time', { ascending: true, nullsFirst: true })
-    setEvents(data ?? [])
+
+    // end_date 없는 이벤트는 시작일이 이달 내여야 함
+    setEvents((data ?? []).filter(ev =>
+      ev.end_date ? true : ev.date >= monthStart
+    ))
   }, [year, month])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
+
+  // 특정 날짜를 포함하는 이벤트 반환
+  function getEventsForDate(dateStr: string): LabEvent[] {
+    return events.filter(ev => {
+      const end = ev.end_date ?? ev.date
+      return ev.date <= dateStr && end >= dateStr
+    })
+  }
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
@@ -75,6 +92,7 @@ export default function LabSchedulePage() {
     setSaving(true)
     await supabase.from('lab_events').insert([{
       date: selected,
+      end_date: form.end_date && form.end_date > selected ? form.end_date : null,
       title: form.title,
       type: form.type,
       description: form.description || null,
@@ -94,21 +112,15 @@ export default function LabSchedulePage() {
     fetchEvents()
   }
 
-  const todayStr  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-  const firstDay  = new Date(year, month, 1).getDay()
+  const todayStr   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const firstDay   = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  const eventsByDate = events.reduce((acc, ev) => {
-    acc[ev.date] = acc[ev.date] ?? []
-    acc[ev.date].push(ev)
-    return acc
-  }, {} as Record<string, LabEvent[]>)
 
   function ds(d: number) {
     return `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
   }
 
-  const dayEvents = selected ? (eventsByDate[selected] ?? []) : []
+  const dayEvents = selected ? getEventsForDate(selected) : []
 
   return (
     <div>
@@ -146,10 +158,19 @@ export default function LabSchedulePage() {
             {Array.from({ length: daysInMonth }, (_, i) => {
               const d    = i + 1
               const date = ds(d)
-              const evs  = eventsByDate[date] ?? []
+              const col  = (firstDay + i) % 7
               const isToday    = date === todayStr
               const isSelected = date === selected
-              const col  = (firstDay + i) % 7
+
+              const allEvs   = getEventsForDate(date)
+              const startEvs = allEvs.filter(ev => ev.date === date)
+              const contEvs  = allEvs.filter(ev => ev.date !== date)
+              const total    = allEvs.length
+
+              // 최대 2줄 표시 (시작 이벤트 우선, 나머지는 연속 바)
+              const showStart = startEvs.slice(0, 2)
+              const showCont  = contEvs.slice(0, Math.max(0, 2 - showStart.length))
+              const remaining = total - showStart.length - showCont.length
 
               return (
                 <div key={d}
@@ -160,25 +181,47 @@ export default function LabSchedulePage() {
 
                   {/* 날짜 숫자 */}
                   <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1 ${
-                    isToday    ? 'bg-blue-600 text-white' :
-                    col === 0  ? 'text-red-400' :
-                    col === 6  ? 'text-blue-500' : 'text-gray-700'
+                    isToday   ? 'bg-blue-600 text-white' :
+                    col === 0 ? 'text-red-400' :
+                    col === 6 ? 'text-blue-500' : 'text-gray-700'
                   }`}>{d}</div>
 
-                  {/* 이벤트 칩 */}
                   <div className="space-y-0.5">
-                    {evs.slice(0, 2).map(ev => {
+                    {/* 이 날 시작하는 이벤트 */}
+                    {showStart.map(ev => {
                       const c = TYPE_COLOR[ev.type] ?? TYPE_COLOR['기타']
+                      const isMultiDay = !!ev.end_date && ev.end_date !== ev.date
                       return (
-                        <div key={ev.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight"
+                        <div key={ev.id}
+                          className="text-xs px-1 py-0.5 rounded truncate leading-tight"
                           style={{ backgroundColor: c.bg, color: c.text }}>
                           {ev.time && <span className="opacity-60 mr-0.5">{ev.time}</span>}
                           {ev.title}
+                          {isMultiDay && <span className="ml-0.5 opacity-50">›</span>}
                         </div>
                       )
                     })}
-                    {evs.length > 2 && (
-                      <div className="text-xs text-gray-400 px-1">+{evs.length - 2}개 더</div>
+
+                    {/* 이전에 시작해서 이어지는 이벤트 - 얇은 색 바 */}
+                    {showCont.map(ev => {
+                      const c = TYPE_COLOR[ev.type] ?? TYPE_COLOR['기타']
+                      const isEndDay = ev.end_date === date
+                      return (
+                        <div key={`c-${ev.id}`}
+                          className="text-xs px-1 leading-[14px] h-[14px] truncate"
+                          style={{
+                            backgroundColor: c.dot,
+                            color: 'white',
+                            opacity: 0.75,
+                            borderRadius: isEndDay ? '0 3px 3px 0' : '0',
+                          }}>
+                          {isEndDay ? `‹ ${ev.title}` : ev.title}
+                        </div>
+                      )
+                    })}
+
+                    {remaining > 0 && (
+                      <div className="text-xs text-gray-400 px-1">+{remaining}개 더</div>
                     )}
                   </div>
                 </div>
@@ -222,6 +265,25 @@ export default function LabSchedulePage() {
                     {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
+
+                {/* 날짜 범위 */}
+                <div className="flex gap-1.5 items-center">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-0.5">시작일</label>
+                    <div className="px-2 py-1.5 border border-gray-200 rounded text-xs bg-white text-gray-500">
+                      {selected}
+                    </div>
+                  </div>
+                  <span className="text-gray-300 mt-4">→</span>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-0.5">종료일 (선택)</label>
+                    <input type="date" value={form.end_date}
+                      min={selected}
+                      onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-0.5">시간</label>
                   <input type="time" value={form.time}
@@ -262,6 +324,7 @@ export default function LabSchedulePage() {
                 <p className="text-xs text-gray-300 text-center py-6">등록된 일정이 없습니다</p>
               ) : dayEvents.map(ev => {
                 const c = TYPE_COLOR[ev.type] ?? TYPE_COLOR['기타']
+                const isMultiDay = !!ev.end_date && ev.end_date !== ev.date
                 return (
                   <div key={ev.id} className="rounded-lg p-3 border border-gray-100">
                     <div className="flex items-start justify-between">
@@ -271,7 +334,13 @@ export default function LabSchedulePage() {
                             style={{ backgroundColor: c.bg, color: c.text }}>{ev.type}</span>
                           {ev.time && <span className="text-xs text-gray-400">{ev.time}</span>}
                         </div>
-                        <p className="text-sm font-semibold text-gray-800 truncate">{ev.title}</p>
+                        <p className="text-sm font-semibold text-gray-800">{ev.title}</p>
+                        {/* 날짜 범위 표시 */}
+                        {isMultiDay && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            📅 {ev.date} ~ {ev.end_date}
+                          </p>
+                        )}
                         {ev.participants && (
                           <p className="text-xs text-gray-400 mt-0.5">👥 {ev.participants}</p>
                         )}

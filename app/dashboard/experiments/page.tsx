@@ -26,6 +26,8 @@ export default function ResearchLogPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState<string | null>(null)
+  const [aiResult, setAiResult] = useState<{ id: string; korean: string; english: string } | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem('lab-my-name')
@@ -75,6 +77,25 @@ export default function ResearchLogPage() {
     setForm({ ...EMPTY_FORM, date: today })
     setShowForm(false)
     fetchLogs(activeTab)
+  }
+
+  async function handleAI(log: ResearchLog) {
+    setAiLoading(log.id)
+    setAiResult(null)
+    try {
+      const res = await fetch('/api/research-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: log.content, results: log.results, next_plan: log.next_plan }),
+      })
+      const data = await res.json()
+      if (data.korean || data.english) setAiResult({ id: log.id, ...data })
+      else alert('AI 오류: ' + (data.error ?? '알 수 없는 오류'))
+    } catch {
+      alert('AI 요청 중 오류가 발생했습니다')
+    } finally {
+      setAiLoading(null)
+    }
   }
 
   async function handleDelete(id: string) {
@@ -258,10 +279,51 @@ export default function ResearchLogPage() {
                     <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.next_plan}</p>
                   </div>
                 )}
+                {/* AI 정리 버튼 */}
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    onClick={e => { e.stopPropagation(); handleAI(log) }}
+                    disabled={aiLoading === log.id}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    {aiLoading === log.id
+                      ? <><span className="animate-spin inline-block">⟳</span> AI 정리 중…</>
+                      : <>✨ AI 정리 · 영문 요약</>}
+                  </button>
+                </div>
+
+                {/* AI 결과 패널 */}
+                {aiResult?.id === log.id && (
+                  <div onClick={e => e.stopPropagation()} className="mt-3 rounded-xl overflow-hidden border border-purple-100">
+                    {/* 한국어 정리 */}
+                    <div className="bg-purple-50 px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-purple-700">✦ 정리된 내용 (KO)</p>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(aiResult.korean)}
+                          className="text-xs text-purple-400 hover:text-purple-600"
+                        >복사</button>
+                      </div>
+                      <p className="text-xs text-purple-900 whitespace-pre-wrap leading-relaxed">{aiResult.korean}</p>
+                    </div>
+                    {/* 영문 요약 */}
+                    <div className="bg-indigo-50 px-4 py-3 border-t border-purple-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-indigo-700">✦ English Summary</p>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(aiResult.english)}
+                          className="text-xs text-indigo-400 hover:text-indigo-600"
+                        >Copy</button>
+                      </div>
+                      <p className="text-xs text-indigo-900 whitespace-pre-wrap leading-relaxed">{aiResult.english}</p>
+                    </div>
+                  </div>
+                )}
+
                 {activeTab === myName && (
                   <button
                     onClick={e => { e.stopPropagation(); handleDelete(log.id) }}
-                    className="text-xs text-red-400 hover:text-red-600 mt-1">
+                    className="text-xs text-red-400 hover:text-red-600">
                     삭제
                   </button>
                 )}

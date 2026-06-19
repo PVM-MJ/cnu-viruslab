@@ -322,8 +322,10 @@ export default function LabSchedulePage() {
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
                 </div>
                 {error && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-mono break-all">
-                    ⚠️ {error}
+                  <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-mono break-all space-y-1">
+                    <div>⚠️ {error}</div>
+                    <div>URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'MISSING'}</div>
+                    <div>KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.slice(0,20)+'...' : 'MISSING'}</div>
                   </div>
                 )}
                 <div className="flex gap-2 pt-1">

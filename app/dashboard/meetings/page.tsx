@@ -39,7 +39,6 @@ export default function LabSchedulePage() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm]         = useState(EMPTY_FORM)
   const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState<string | null>(null)
 
   const fetchEvents = useCallback(async () => {
     const mm = String(month + 1).padStart(2, '0')
@@ -96,7 +95,6 @@ export default function LabSchedulePage() {
     e.preventDefault()
     if (!selected) return
     setSaving(true)
-    setError(null)
     const { error: err } = await supabase.from('lab_events').insert([{
       date: selected,
       end_date: form.end_date && form.end_date > selected ? form.end_date : null,
@@ -108,10 +106,7 @@ export default function LabSchedulePage() {
       created_by: form.created_by || null,
     }])
     setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
+    if (err) return
     setForm(EMPTY_FORM)
     setShowForm(false)
     fetchEvents()
@@ -321,14 +316,7 @@ export default function LabSchedulePage() {
                     placeholder="이름"
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
                 </div>
-                {error && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 font-mono break-all space-y-1">
-                    <div>⚠️ {error}</div>
-                    <div>URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'MISSING'}</div>
-                    <div>KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.slice(0,20)+'...' : 'MISSING'}</div>
-                  </div>
-                )}
-                <div className="flex gap-2 pt-1">
+<div className="flex gap-2 pt-1">
                   <button type="button" onClick={() => setShowForm(false)}
                     className="flex-1 py-1.5 text-xs border border-gray-300 rounded hover:bg-white">취소</button>
                   <button type="submit" disabled={saving}

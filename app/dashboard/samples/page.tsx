@@ -34,7 +34,6 @@ export default function SamplesPage() {
   const [selected, setSelected] = useState<Sample | null>(null)
   const [loading, setLoading] = useState(false)
   const [counts, setCounts] = useState<Record<string, number>>({})
-  const [error, setError] = useState<string | null>(null)
 
   async function fetchSamples(tab: Category) {
     const { data } = await supabase
@@ -68,8 +67,7 @@ export default function SamplesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-    const { error: err } = await supabase.from('samples').insert([{
+    await supabase.from('samples').insert([{
       sample_id: form.sample_id,
       type: activeTab,
       source: form.source || null,
@@ -78,11 +76,6 @@ export default function SamplesPage() {
       location: form.location || null,
       notes: form.notes || null,
     }])
-    if (err) {
-      setError(err.message)
-      setLoading(false)
-      return
-    }
     setForm(EMPTY(activeTab))
     setShowForm(false)
     setLoading(false)
@@ -110,12 +103,6 @@ export default function SamplesPage() {
           + 등록
         </button>
       </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 font-mono break-all">
-          ⚠️ 저장 오류: {error}
-        </div>
-      )}
 
       {/* 카테고리 탭 */}
       <div className="flex gap-2 mb-6 flex-wrap">

@@ -96,6 +96,7 @@ export default function AnnouncementsPage() {
   const [kakaoText, setKakaoText] = useState('')
 
   const [saving, setSaving] = useState(false)
+  const [summarizing, setSummarizing] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const fetchAnnouncements = useCallback(async () => {
@@ -128,6 +129,25 @@ export default function AnnouncementsPage() {
     setKakaoText('')
     setShowKakao(false)
     setShowForm(true)
+  }
+
+  async function handleSummarize() {
+    if (!form.content.trim()) return
+    setSummarizing(true)
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: form.content }),
+      })
+      const data = await res.json()
+      if (data.summary) setForm(f => ({ ...f, content: data.summary }))
+      else alert('요약 실패: ' + (data.error ?? '알 수 없는 오류'))
+    } catch {
+      alert('요약 중 오류가 발생했습니다')
+    } finally {
+      setSummarizing(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -242,11 +262,25 @@ export default function AnnouncementsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">내용 *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-500">내용 *</label>
+                <button
+                  type="button"
+                  onClick={handleSummarize}
+                  disabled={!form.content.trim() || summarizing}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-40 transition-colors font-medium"
+                >
+                  {summarizing ? (
+                    <><span className="animate-spin inline-block">⟳</span> 요약 중…</>
+                  ) : (
+                    <>✨ AI 요약</>
+                  )}
+                </button>
+              </div>
               <textarea
                 required rows={6} value={form.content}
                 onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                placeholder="공지 내용"
+                placeholder="공지 내용을 입력하거나, 카카오톡에서 가져온 뒤 AI 요약을 사용해보세요"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

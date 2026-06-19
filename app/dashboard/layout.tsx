@@ -10,6 +10,7 @@ const navItems = [
   { href: '/dashboard/samples', label: '샘플 현황', icon: '🧪' },
   { href: '/dashboard/reagents', label: '시약 재고', icon: '💊' },
   { href: '/dashboard/floorplan', label: '실험실 도면', icon: '🗺️' },
+  { href: '/dashboard/plantroom', label: '식물방 도면', icon: '🌱' },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

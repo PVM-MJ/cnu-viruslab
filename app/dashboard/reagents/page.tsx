@@ -9,12 +9,13 @@ import type { Reagent } from '@/lib/types'
 type Tab = 'inventory' | 'orders' | 'history'
 
 const EMPTY_REAGENT = { name: '', quantity: '', unit: 'mL', expiry_date: '', location: '', notes: '' }
-const EMPTY_ORDER   = { name: '', quantity: '', unit: '', notes: '', requester: '' }
+const EMPTY_ORDER   = { name: '', quantity: '', unit: '', notes: '', requester: '', url: '' }
 
 function buildNotesWithCatalog(
   baseNotes: string,
   cat: ReagentCatalogEntry | null,
-  requester: string
+  requester: string,
+  manualUrl: string
 ): string {
   const parts: string[] = []
   if (requester) parts.push(`[요청자: ${requester}]`)
@@ -22,8 +23,10 @@ function buildNotesWithCatalog(
     if (cat.company)   parts.push(`[회사: ${cat.company}]`)
     if (cat.catalogNo) parts.push(`[품번: ${cat.catalogNo}]`)
     if (cat.volume)    parts.push(`[규격: ${cat.volume}]`)
-    if (cat.url)       parts.push(`[링크: ${cat.url}]`)
+    const url = manualUrl || cat.url
+    if (url)           parts.push(`[링크: ${url}]`)
   }
+  if (!cat && manualUrl) parts.push(`[링크: ${manualUrl}]`)
   if (baseNotes) parts.push(baseNotes)
   return parts.join(' ')
 }
@@ -89,7 +92,7 @@ export default function ReagentsPage() {
   }
 
   function handleSelectCatalog(entry: ReagentCatalogEntry) {
-    setOrderForm(f => ({ ...f, name: entry.name }))
+    setOrderForm(f => ({ ...f, name: entry.name, url: entry.url || f.url }))
     setSelectedCatalog(entry)
     setShowSuggestions(false)
     setSuggestions([])
@@ -125,7 +128,7 @@ export default function ReagentsPage() {
   async function handleAddOrder(e: React.FormEvent) {
     e.preventDefault()
     setOrderLoading(true)
-    const notes = buildNotesWithCatalog(orderForm.notes, selectedCatalog, orderForm.requester)
+    const notes = buildNotesWithCatalog(orderForm.notes, selectedCatalog, orderForm.requester, orderForm.url)
     await supabase.from('reagents').insert([{
       name: orderForm.name,
       quantity: orderForm.quantity ? Number(orderForm.quantity) : null,
@@ -135,6 +138,7 @@ export default function ReagentsPage() {
     }])
     setOrderForm(EMPTY_ORDER)
     setSelectedCatalog(null)
+    setSuggestions([])
     setShowOrder(false)
     setOrderLoading(false)
     fetchOrders()
@@ -410,6 +414,13 @@ export default function ReagentsPage() {
                   <input type="text" value={orderForm.requester}
                     onChange={e => setOrderForm(f => ({ ...f, requester: e.target.value }))}
                     placeholder="이름"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">구매처 링크</label>
+                  <input type="url" value={orderForm.url}
+                    onChange={e => setOrderForm(f => ({ ...f, url: e.target.value }))}
+                    placeholder="https://..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
                 <div className="col-span-2">

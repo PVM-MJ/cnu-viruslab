@@ -102,10 +102,9 @@ export default function PlantRoomPage() {
   }
 
   // Layout constants
-  const LU_X = 10, LU_Y = 15          // left upper: 4 cols × 4 rows
-  const LL_X = 10, LL_Y = 15 + 4 * C  // left lower: 3 cols × 5 rows
-  const R_X  = 352, R_Y = 15           // right: 4 cols × 8 rows
-  const BENCH_Y = 15 + 9 * C + 8       // bottom bench
+  const LU_X = 12, LU_Y = 15          // left upper: 4 cols × 4 rows
+  const LL_X = 12, LL_Y = LU_Y + 4 * C  // left lower: 3 cols × 5 rows
+  const R_X  = 344, R_Y = 15           // right: 4 cols × 8 rows (344+4*C=480, fits in room)
 
   return (
     <div>
@@ -114,10 +113,10 @@ export default function PlantRoomPage() {
 
       <div className="flex gap-5 items-start">
         {/* SVG Floor Plan */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3 shrink-0">
-          <svg viewBox="0 0 490 465" width={490} height={465}>
+        <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto">
+          <svg viewBox="0 0 490 400" className="w-full" style={{ minWidth: 400, maxWidth: 490 }}>
             {/* Room background */}
-            <rect x={5} y={5} width={480} height={420} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
+            <rect x={5} y={5} width={480} height={370} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
 
             {/* Section background fills */}
             <rect x={LU_X - 1} y={LU_Y - 1} width={4 * C + 2} height={4 * C + 2} fill="#EFF6FF" rx={1} />
@@ -152,14 +151,10 @@ export default function PlantRoomPage() {
             <text x={LU_X + 2 * C} y={LU_Y - 8} textAnchor="middle" fontSize={9} fill="#6B7280" fontFamily="system-ui">좌측 상단</text>
             <text x={R_X  + 2 * C} y={R_Y  - 8} textAnchor="middle" fontSize={9} fill="#6B7280" fontFamily="system-ui">우측</text>
 
-            {/* Bottom bench */}
-            <rect x={10} y={BENCH_Y} width={472} height={65} fill="#F1F5F9" stroke="#CBD5E1" strokeWidth={1} rx={2} />
-            <text x={246} y={BENCH_Y + 32} textAnchor="middle" dominantBaseline="middle" fontSize={11} fill="#94A3B8" fontFamily="system-ui">하단 테이블</text>
-
-            {/* Door (gap + arc swinging outward) */}
-            <rect x={205} y={423} width={80} height={4} fill="#F8FAFC" />
-            <path d="M 205 425 A 80 80 0 0 1 285 425" fill="none" stroke="#9CA3AF" strokeWidth={1.5} />
-            <line x1={205} y1={425} x2={285} y2={425} stroke="#374151" strokeWidth={1.5} />
+            {/* Door — gap in bottom wall + arc */}
+            <rect x={210} y={371} width={70} height={6} fill="#F8FAFC" />
+            <path d="M 210 373 A 35 35 0 0 1 280 373" fill="none" stroke="#9CA3AF" strokeWidth={1.5} />
+            <text x={245} y={393} textAnchor="middle" fontSize={8} fill="#9CA3AF" fontFamily="system-ui">출입문</text>
           </svg>
         </div>
 

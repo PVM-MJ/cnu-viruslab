@@ -15,7 +15,7 @@ interface PlantRecord {
 }
 
 const STAGES = ['파종', '발아', '생육', '접종', '관찰 중', '완료']
-const C = 62 // cell size in SVG units
+const C = 55 // cell size in SVG units
 
 const EMPTY_FORM = { plant_name: '', experiment: '', stage: '파종', notes: '', start_date: '' }
 
@@ -101,22 +101,22 @@ export default function PlantRoomPage() {
     )
   }
 
-  // Layout constants (C=62: LU 4×4=248, LL 3×5=186×310, R 4×8=248×496)
-  const LU_X = 18, LU_Y = 25
-  const LL_X = 18, LL_Y = LU_Y + 4 * C
-  const R_X  = 18 + 4 * C + 180, R_Y = 25  // 18+248+180=446
+  // Layout constants (C=55: LU 220×220, LL 165×275, R 220×440)
+  const LU_X = 20, LU_Y = 30
+  const LL_X = 20, LL_Y = LU_Y + 4 * C      // 30+220=250
+  const R_X  = 20 + 4 * C + 280, R_Y = 30   // 20+220+280=520
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-2">🌱 식물방 도면</h2>
       <p className="text-sm text-gray-400 mb-5">선반 칸을 클릭하면 재배 현황을 확인하고 추가할 수 있습니다</p>
 
-      <div className="flex gap-5 items-start">
+      <div>
         {/* SVG Floor Plan */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto flex-1">
-          <svg viewBox="0 0 880 580" className="w-full" style={{ minWidth: 600 }}>
-            {/* Room background — 870×568 */}
-            <rect x={5} y={5} width={870} height={568} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
+        <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto mb-4">
+          <svg viewBox="0 0 800 600" className="w-full">
+            {/* Room background — 790×578 */}
+            <rect x={5} y={5} width={790} height={578} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
 
             {/* Section background fills */}
             <rect x={LU_X - 1} y={LU_Y - 1} width={4 * C + 2} height={4 * C + 2} fill="#EFF6FF" rx={1} />
@@ -152,15 +152,15 @@ export default function PlantRoomPage() {
             <text x={R_X  + 2 * C} y={R_Y  - 10} textAnchor="middle" fontSize={13} fill="#6B7280" fontFamily="system-ui">우측</text>
 
             {/* Door — gap in bottom wall + arc */}
-            <rect x={370} y={569} width={110} height={10} fill="#F8FAFC" />
-            <path d="M 370 572 A 55 55 0 0 1 480 572" fill="none" stroke="#9CA3AF" strokeWidth={2} />
-            <text x={425} y={592} textAnchor="middle" fontSize={12} fill="#9CA3AF" fontFamily="system-ui">출입문</text>
+            <rect x={370} y={578} width={60} height={10} fill="#F8FAFC" />
+            <path d="M 370 583 A 30 30 0 0 1 430 583" fill="none" stroke="#9CA3AF" strokeWidth={2} />
+            <text x={400} y={598} textAnchor="middle" fontSize={12} fill="#9CA3AF" fontFamily="system-ui">출입문</text>
           </svg>
         </div>
 
-        {/* Side panel */}
+        {/* Selected cell panel */}
         {selected && (
-          <div className="w-64 shrink-0 bg-white border border-gray-200 rounded-xl p-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="font-bold text-gray-800 text-sm">{selected}</h3>

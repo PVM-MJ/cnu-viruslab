@@ -31,6 +31,7 @@ export interface Sample {
   id: string
   sample_id: string
   type: string
+  researcher: string | null
   source: string | null
   collection_date: string | null
   stage: SampleStage

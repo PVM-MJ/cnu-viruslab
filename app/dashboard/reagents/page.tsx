@@ -3,12 +3,30 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { STORAGE_LOCATIONS } from '@/lib/storage-locations'
+import { REAGENT_CATALOG, type ReagentCatalogEntry } from '@/lib/reagent-catalog'
 import type { Reagent } from '@/lib/types'
 
-type Tab = 'inventory' | 'orders'
+type Tab = 'inventory' | 'orders' | 'history'
 
 const EMPTY_REAGENT = { name: '', quantity: '', unit: 'mL', expiry_date: '', location: '', notes: '' }
 const EMPTY_ORDER   = { name: '', quantity: '', unit: '', notes: '', requester: '' }
+
+function buildNotesWithCatalog(
+  baseNotes: string,
+  cat: ReagentCatalogEntry | null,
+  requester: string
+): string {
+  const parts: string[] = []
+  if (requester) parts.push(`[요청자: ${requester}]`)
+  if (cat) {
+    if (cat.company)   parts.push(`[회사: ${cat.company}]`)
+    if (cat.catalogNo) parts.push(`[품번: ${cat.catalogNo}]`)
+    if (cat.volume)    parts.push(`[규격: ${cat.volume}]`)
+    if (cat.url)       parts.push(`[링크: ${cat.url}]`)
+  }
+  if (baseNotes) parts.push(baseNotes)
+  return parts.join(' ')
+}
 
 export default function ReagentsPage() {
   const [tab, setTab] = useState<Tab>('inventory')
@@ -26,6 +44,15 @@ export default function ReagentsPage() {
   const [orderForm, setOrderForm]   = useState(EMPTY_ORDER)
   const [orderLoading, setOrderLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Reagent | null>(null)
+
+  // 자동완성
+  const [suggestions, setSuggestions]         = useState<ReagentCatalogEntry[]>([])
+  const [selectedCatalog, setSelectedCatalog] = useState<ReagentCatalogEntry | null>(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // 구매 이력 검색
+  const [historySearch, setHistorySearch] = useState('')
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null)
 
   async function fetchReagents() {
     const { data } = await supabase.from('reagents').select('*').eq('needs_order', false).order('name')
@@ -45,6 +72,28 @@ export default function ReagentsPage() {
     setSelected(null)
     setSelectedOrder(null)
   }, [tab])
+
+  function handleOrderNameChange(value: string) {
+    setOrderForm(f => ({ ...f, name: value }))
+    if (value.trim().length < 1) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    const q = value.toLowerCase()
+    const matched = REAGENT_CATALOG.filter(e =>
+      e.name.toLowerCase().includes(q)
+    ).slice(0, 8)
+    setSuggestions(matched)
+    setShowSuggestions(matched.length > 0)
+  }
+
+  function handleSelectCatalog(entry: ReagentCatalogEntry) {
+    setOrderForm(f => ({ ...f, name: entry.name }))
+    setSelectedCatalog(entry)
+    setShowSuggestions(false)
+    setSuggestions([])
+  }
 
   // ── 시약 현황 핸들러 ──────────────────────────────────────────
   async function handleAddReagent(e: React.FormEvent) {
@@ -76,16 +125,16 @@ export default function ReagentsPage() {
   async function handleAddOrder(e: React.FormEvent) {
     e.preventDefault()
     setOrderLoading(true)
+    const notes = buildNotesWithCatalog(orderForm.notes, selectedCatalog, orderForm.requester)
     await supabase.from('reagents').insert([{
       name: orderForm.name,
       quantity: orderForm.quantity ? Number(orderForm.quantity) : null,
       unit: orderForm.unit || null,
       needs_order: true,
-      notes: orderForm.notes
-        ? `[요청자: ${orderForm.requester || '미입력'}] ${orderForm.notes}`
-        : orderForm.requester ? `[요청자: ${orderForm.requester}]` : null,
+      notes: notes || null,
     }])
     setOrderForm(EMPTY_ORDER)
+    setSelectedCatalog(null)
     setShowOrder(false)
     setOrderLoading(false)
     fetchOrders()
@@ -104,21 +153,33 @@ export default function ReagentsPage() {
     fetchOrders()
   }
 
+  // 구매 이력 필터
+  const filteredHistory = historySearch.trim()
+    ? REAGENT_CATALOG.filter(e =>
+        e.name.toLowerCase().includes(historySearch.toLowerCase()) ||
+        e.company.toLowerCase().includes(historySearch.toLowerCase()) ||
+        e.catalogNo.toLowerCase().includes(historySearch.toLowerCase())
+      )
+    : REAGENT_CATALOG
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">💊 시약 재고</h2>
 
       {/* 탭 */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 flex-wrap">
         {([
-          { key: 'inventory', label: '시약 현황', icon: '🧴', count: reagents.length },
-          { key: 'orders',    label: '시약 주문요청', icon: '📋', count: orders.length },
+          { key: 'inventory', label: '시약 현황',   icon: '🧴', count: reagents.length, color: 'blue' },
+          { key: 'orders',    label: '시약 주문요청', icon: '📋', count: orders.length,  color: 'orange' },
+          { key: 'history',   label: '구매 이력',    icon: '📂', count: REAGENT_CATALOG.length, color: 'gray' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-colors ${
               tab === t.key
-                ? t.key === 'orders'
+                ? t.color === 'orange'
                   ? 'bg-orange-500 text-white border-orange-500'
+                  : t.color === 'gray'
+                  ? 'bg-gray-600 text-white border-gray-600'
                   : 'bg-blue-600 text-white border-blue-600'
                 : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
             }`}>
@@ -126,7 +187,11 @@ export default function ReagentsPage() {
             {t.label}
             {t.count > 0 && (
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                tab === t.key ? 'bg-white/20 text-white' : t.key === 'orders' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'
+                tab === t.key
+                  ? 'bg-white/20 text-white'
+                  : t.color === 'orange'
+                  ? 'bg-orange-100 text-orange-600'
+                  : 'bg-gray-100 text-gray-500'
               }`}>{t.count}</span>
             )}
           </button>
@@ -249,7 +314,7 @@ export default function ReagentsPage() {
       {tab === 'orders' && (
         <>
           <div className="flex justify-end mb-4">
-            <button onClick={() => { setShowOrder(v => !v); setSelectedOrder(null) }}
+            <button onClick={() => { setShowOrder(v => !v); setSelectedOrder(null); setSelectedCatalog(null) }}
               className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium">
               + 주문 요청
             </button>
@@ -259,13 +324,73 @@ export default function ReagentsPage() {
             <div className="bg-white border border-orange-100 rounded-xl p-6 mb-6 shadow-sm">
               <h3 className="font-semibold text-gray-700 mb-4">📋 새 주문 요청</h3>
               <form onSubmit={handleAddOrder} className="grid grid-cols-2 gap-4">
+
+                {/* 시약명 + 자동완성 */}
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">시약명 *</label>
-                  <input type="text" required value={orderForm.name}
-                    onChange={e => setOrderForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="예: SYBR Green Master Mix"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={orderForm.name}
+                      onChange={e => handleOrderNameChange(e.target.value)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                      placeholder="시약명 입력 (이전 구매 목록에서 자동완성)"
+                      autoComplete="off"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <ul className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-56 overflow-y-auto"
+                          style={{ zIndex: 9999 }}>
+                        {suggestions.map((s, i) => (
+                          <li
+                            key={i}
+                            onMouseDown={() => handleSelectCatalog(s)}
+                            className="px-3 py-2.5 hover:bg-orange-50 cursor-pointer border-b border-gray-50 last:border-0"
+                          >
+                            <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {[s.company, s.catalogNo, s.volume].filter(Boolean).join(' · ')}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
+
+                {/* 카탈로그 정보 미리보기 */}
+                {selectedCatalog && (
+                  <div className="col-span-2 bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div className="flex items-start justify-between mb-1.5">
+                      <p className="text-xs font-semibold text-orange-700">📦 이전 구매 정보 자동 포함</p>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCatalog(null)}
+                        className="text-xs text-orange-400 hover:text-orange-600 ml-2 shrink-0"
+                      >
+                        제거
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                      {selectedCatalog.company   && <span><span className="text-gray-400">회사 </span>{selectedCatalog.company}</span>}
+                      {selectedCatalog.catalogNo && <span><span className="text-gray-400">품번 </span>{selectedCatalog.catalogNo}</span>}
+                      {selectedCatalog.volume    && <span><span className="text-gray-400">규격 </span>{selectedCatalog.volume}</span>}
+                      {selectedCatalog.url       && (
+                        <a
+                          href={selectedCatalog.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 underline col-span-2 truncate"
+                        >
+                          구매처 링크 →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">수량</label>
                   <input type="number" value={orderForm.quantity}
@@ -288,13 +413,14 @@ export default function ReagentsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">메모 (카탈로그 번호, 제조사 등)</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">추가 메모</label>
                   <textarea rows={2} value={orderForm.notes}
                     onChange={e => setOrderForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="추가 요청사항이 있으면 입력하세요"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" />
                 </div>
                 <div className="col-span-2 flex gap-2 justify-end">
-                  <button type="button" onClick={() => setShowOrder(false)}
+                  <button type="button" onClick={() => { setShowOrder(false); setSelectedCatalog(null) }}
                     className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">취소</button>
                   <button type="submit" disabled={orderLoading}
                     className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">요청 등록</button>
@@ -345,6 +471,76 @@ export default function ReagentsPage() {
                 )}
               </div>
             ))}
+          </div>
+        </>
+      )}
+
+      {/* ── 구매 이력 탭 ── */}
+      {tab === 'history' && (
+        <>
+          <div className="mb-4">
+            <input
+              type="text"
+              value={historySearch}
+              onChange={e => { setHistorySearch(e.target.value); setExpandedHistory(null) }}
+              placeholder="시약명 / 회사명 / 품번으로 검색..."
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+            />
+            <p className="text-xs text-gray-400 mt-1.5 ml-1">
+              총 {filteredHistory.length}개 {historySearch && `/ 전체 ${REAGENT_CATALOG.length}개`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {filteredHistory.map((entry, i) => (
+              <div
+                key={i}
+                onClick={() => setExpandedHistory(expandedHistory === entry.name ? null : entry.name)}
+                className={`bg-white border rounded-xl px-5 py-4 cursor-pointer transition-colors ${
+                  expandedHistory === entry.name ? 'border-gray-400 shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{entry.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {[entry.company, entry.catalogNo].filter(Boolean).join(' · ')}
+                      {entry.volume && <span className="ml-2 text-gray-300">|</span>}
+                      {entry.volume && <span className="ml-2">{entry.volume}</span>}
+                    </p>
+                  </div>
+                  <span className="text-gray-300 text-sm shrink-0">
+                    {expandedHistory === entry.name ? '▲' : '▼'}
+                  </span>
+                </div>
+
+                {expandedHistory === entry.name && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                    {entry.company   && <div><span className="text-gray-400">회사</span> <span className="text-gray-700">{entry.company}</span></div>}
+                    {entry.catalogNo && <div><span className="text-gray-400">품번</span> <span className="text-gray-700">{entry.catalogNo}</span></div>}
+                    {entry.volume    && <div><span className="text-gray-400">규격</span> <span className="text-gray-700">{entry.volume}</span></div>}
+                    {entry.url && (
+                      <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="col-span-2 text-blue-500 underline truncate mt-0.5"
+                      >
+                        구매처 링크 →
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {filteredHistory.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-4xl mb-3">🔍</div>
+                <p className="text-sm">검색 결과가 없습니다.</p>
+              </div>
+            )}
           </div>
         </>
       )}

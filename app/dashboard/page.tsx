@@ -23,7 +23,7 @@ export default function DashboardPage() {
       ])
       const { count: needsOrder } = await supabase.from('reagents').select('id', { count: 'exact', head: true }).eq('needs_order', true)
       setCounts({ meetings: m.count ?? 0, logs: l.count ?? 0, samples: s.count ?? 0, reagents: r.count ?? 0, needsOrder: needsOrder ?? 0 })
-      const names = [...new Set((todayLogs.data ?? []).map((r: { researcher: string }) => r.researcher))]
+      const names = Array.from(new Set((todayLogs.data ?? []).map((r: { researcher: string }) => r.researcher)))
       setTodayLoggers(names)
     }
     fetchCounts()

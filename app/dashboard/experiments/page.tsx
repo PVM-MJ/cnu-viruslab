@@ -63,16 +63,17 @@ export default function ResearchLogPage() {
     e.preventDefault()
     if (!activeTab) return
     setSaving(true)
-    await supabase.from('research_logs').insert([{
+    const { error } = await supabase.from('research_logs').insert([{
       researcher: activeTab,
       date: form.date,
       content: form.content,
       results: form.results || null,
       next_plan: form.next_plan || null,
     }])
+    setSaving(false)
+    if (error) { alert('저장 실패: ' + error.message); return }
     setForm({ ...EMPTY_FORM, date: today })
     setShowForm(false)
-    setSaving(false)
     fetchLogs(activeTab)
   }
 

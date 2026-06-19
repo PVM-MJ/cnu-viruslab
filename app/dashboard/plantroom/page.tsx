@@ -15,7 +15,7 @@ interface PlantRecord {
 }
 
 const STAGES = ['파종', '발아', '생육', '접종', '관찰 중', '완료']
-const C = 46 // cell size in SVG units
+const C = 62 // cell size in SVG units
 
 const EMPTY_FORM = { plant_name: '', experiment: '', stage: '파종', notes: '', start_date: '' }
 
@@ -91,20 +91,20 @@ export default function PlantRoomPage() {
           strokeWidth={isSel ? 2 : 1}
         />
         <text x={x + C / 2} y={y + C / 2} textAnchor="middle" dominantBaseline="middle"
-          fontSize={8.5} fill={isSel ? 'white' : '#9CA3AF'} fontFamily="system-ui">
+          fontSize={11} fill={isSel ? 'white' : '#9CA3AF'} fontFamily="system-ui">
           {section}{row}-{col}
         </text>
         {hasPlant && !isSel && (
-          <circle cx={x + C - 6} cy={y + 6} r={4.5} fill="#10B981" />
+          <circle cx={x + C - 8} cy={y + 8} r={6} fill="#10B981" />
         )}
       </g>
     )
   }
 
-  // Layout constants (C=46: LU 4×4=184, LL 3×5=138×230, R 4×8=184×368)
-  const LU_X = 15, LU_Y = 20
-  const LL_X = 15, LL_Y = LU_Y + 4 * C
-  const R_X  = 15 + 4 * C + 140, R_Y = 20  // 15+184+140=339
+  // Layout constants (C=62: LU 4×4=248, LL 3×5=186×310, R 4×8=248×496)
+  const LU_X = 18, LU_Y = 25
+  const LL_X = 18, LL_Y = LU_Y + 4 * C
+  const R_X  = 18 + 4 * C + 180, R_Y = 25  // 18+248+180=446
 
   return (
     <div>
@@ -113,10 +113,10 @@ export default function PlantRoomPage() {
 
       <div className="flex gap-5 items-start">
         {/* SVG Floor Plan */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto">
-          <svg viewBox="0 0 660 480" className="w-full" style={{ minWidth: 500, maxWidth: 700 }}>
-            {/* Room background — 650×470 */}
-            <rect x={5} y={5} width={650} height={468} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
+        <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto flex-1">
+          <svg viewBox="0 0 880 580" className="w-full" style={{ minWidth: 600 }}>
+            {/* Room background — 870×568 */}
+            <rect x={5} y={5} width={870} height={568} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
 
             {/* Section background fills */}
             <rect x={LU_X - 1} y={LU_Y - 1} width={4 * C + 2} height={4 * C + 2} fill="#EFF6FF" rx={1} />
@@ -148,13 +148,13 @@ export default function PlantRoomPage() {
             )}
 
             {/* Section labels */}
-            <text x={LU_X + 2 * C} y={LU_Y - 8} textAnchor="middle" fontSize={11} fill="#6B7280" fontFamily="system-ui">좌측 상단</text>
-            <text x={R_X  + 2 * C} y={R_Y  - 8} textAnchor="middle" fontSize={11} fill="#6B7280" fontFamily="system-ui">우측</text>
+            <text x={LU_X + 2 * C} y={LU_Y - 10} textAnchor="middle" fontSize={13} fill="#6B7280" fontFamily="system-ui">좌측 상단</text>
+            <text x={R_X  + 2 * C} y={R_Y  - 10} textAnchor="middle" fontSize={13} fill="#6B7280" fontFamily="system-ui">우측</text>
 
             {/* Door — gap in bottom wall + arc */}
-            <rect x={280} y={469} width={90} height={8} fill="#F8FAFC" />
-            <path d="M 280 471 A 45 45 0 0 1 370 471" fill="none" stroke="#9CA3AF" strokeWidth={1.5} />
-            <text x={325} y={490} textAnchor="middle" fontSize={10} fill="#9CA3AF" fontFamily="system-ui">출입문</text>
+            <rect x={370} y={569} width={110} height={10} fill="#F8FAFC" />
+            <path d="M 370 572 A 55 55 0 0 1 480 572" fill="none" stroke="#9CA3AF" strokeWidth={2} />
+            <text x={425} y={592} textAnchor="middle" fontSize={12} fill="#9CA3AF" fontFamily="system-ui">출입문</text>
           </svg>
         </div>
 

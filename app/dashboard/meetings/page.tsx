@@ -1,116 +1,309 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { LabMeeting } from '@/lib/types'
 
-const empty = { date: '', presenter: '', title: '', content: '', decisions: '', next_meeting: '', created_by: '' }
+interface LabEvent {
+  id: string
+  date: string
+  title: string
+  type: string
+  description: string | null
+  time: string | null
+  participants: string | null
+  created_by: string | null
+  created_at: string
+}
 
-export default function MeetingsPage() {
-  const [meetings, setMeetings] = useState<LabMeeting[]>([])
+const EVENT_TYPES = ['랩 미팅', '발표/세미나', '실험 일정', '외부 일정', '기타']
+
+const TYPE_COLOR: Record<string, { bg: string; text: string; dot: string }> = {
+  '랩 미팅':    { bg: '#DBEAFE', text: '#1D4ED8', dot: '#3B82F6' },
+  '발표/세미나': { bg: '#EDE9FE', text: '#6D28D9', dot: '#8B5CF6' },
+  '실험 일정':  { bg: '#D1FAE5', text: '#065F46', dot: '#10B981' },
+  '외부 일정':  { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' },
+  '기타':       { bg: '#F3F4F6', text: '#4B5563', dot: '#9CA3AF' },
+}
+
+const DAYS = ['일', '월', '화', '수', '목', '금', '토']
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월']
+const EMPTY_FORM = { title: '', type: '랩 미팅', description: '', time: '', participants: '', created_by: '' }
+
+export default function LabSchedulePage() {
+  const now = new Date()
+  const [year, setYear]     = useState(now.getFullYear())
+  const [month, setMonth]   = useState(now.getMonth())
+  const [selected, setSelected] = useState<string | null>(null)
+  const [events, setEvents] = useState<LabEvent[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(empty)
-  const [selected, setSelected] = useState<LabMeeting | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [form, setForm]     = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
 
-  async function fetchMeetings() {
-    const { data } = await supabase.from('lab_meetings').select('*').order('date', { ascending: false })
-    setMeetings(data ?? [])
+  const fetchEvents = useCallback(async () => {
+    const mm = String(month + 1).padStart(2, '0')
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const { data } = await supabase
+      .from('lab_events')
+      .select('*')
+      .gte('date', `${year}-${mm}-01`)
+      .lte('date', `${year}-${mm}-${lastDay}`)
+      .order('time', { ascending: true, nullsFirst: true })
+    setEvents(data ?? [])
+  }, [year, month])
+
+  useEffect(() => { fetchEvents() }, [fetchEvents])
+
+  function prevMonth() {
+    if (month === 0) { setYear(y => y - 1); setMonth(11) }
+    else setMonth(m => m - 1)
+    setSelected(null)
   }
-
-  useEffect(() => { fetchMeetings() }, [])
+  function nextMonth() {
+    if (month === 11) { setYear(y => y + 1); setMonth(0) }
+    else setMonth(m => m + 1)
+    setSelected(null)
+  }
+  function goToday() {
+    setYear(now.getFullYear())
+    setMonth(now.getMonth())
+    setSelected(todayStr)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    await supabase.from('lab_meetings').insert([{
-      ...form,
-      next_meeting: form.next_meeting || null,
+    if (!selected) return
+    setSaving(true)
+    await supabase.from('lab_events').insert([{
+      date: selected,
+      title: form.title,
+      type: form.type,
+      description: form.description || null,
+      time: form.time || null,
+      participants: form.participants || null,
+      created_by: form.created_by || null,
     }])
-    setForm(empty)
+    setForm(EMPTY_FORM)
     setShowForm(false)
-    setLoading(false)
-    fetchMeetings()
+    setSaving(false)
+    fetchEvents()
   }
 
   async function handleDelete(id: string) {
     if (!confirm('삭제하시겠습니까?')) return
-    await supabase.from('lab_meetings').delete().eq('id', id)
-    setSelected(null)
-    fetchMeetings()
+    await supabase.from('lab_events').delete().eq('id', id)
+    fetchEvents()
   }
+
+  const todayStr  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const firstDay  = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const eventsByDate = events.reduce((acc, ev) => {
+    acc[ev.date] = acc[ev.date] ?? []
+    acc[ev.date].push(ev)
+    return acc
+  }, {} as Record<string, LabEvent[]>)
+
+  function ds(d: number) {
+    return `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+  }
+
+  const dayEvents = selected ? (eventsByDate[selected] ?? []) : []
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">📋 랩 미팅 기록</h2>
-        <button onClick={() => { setShowForm(true); setSelected(null) }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-          + 새 미팅 기록
-        </button>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">📅 실험실 일정</h2>
+
+      <div className="flex gap-5 items-start">
+        {/* ── 캘린더 ── */}
+        <div className="flex-1 bg-white border border-gray-200 rounded-xl overflow-hidden min-w-0">
+
+          {/* 월 네비게이션 */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-lg">‹</button>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-gray-800 text-lg">{year}년 {MONTHS[month]}</h3>
+              <button onClick={goToday} className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">오늘</button>
+            </div>
+            <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-lg">›</button>
+          </div>
+
+          {/* 요일 헤더 */}
+          <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-100">
+            {DAYS.map((d, i) => (
+              <div key={d} className={`py-2 text-center text-xs font-semibold ${
+                i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-500' : 'text-gray-500'
+              }`}>{d}</div>
+            ))}
+          </div>
+
+          {/* 날짜 셀 */}
+          <div className="grid grid-cols-7">
+            {Array.from({ length: firstDay }, (_, i) => (
+              <div key={`e${i}`} className="h-24 border-b border-r border-gray-50 bg-gray-50/50" />
+            ))}
+
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const d    = i + 1
+              const date = ds(d)
+              const evs  = eventsByDate[date] ?? []
+              const isToday    = date === todayStr
+              const isSelected = date === selected
+              const col  = (firstDay + i) % 7
+
+              return (
+                <div key={d}
+                  onClick={() => { setSelected(isSelected ? null : date); setShowForm(false) }}
+                  className={`h-24 border-b border-r border-gray-100 p-1.5 cursor-pointer transition-colors ${
+                    isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                  }`}>
+
+                  {/* 날짜 숫자 */}
+                  <div className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold mb-1 ${
+                    isToday    ? 'bg-blue-600 text-white' :
+                    col === 0  ? 'text-red-400' :
+                    col === 6  ? 'text-blue-500' : 'text-gray-700'
+                  }`}>{d}</div>
+
+                  {/* 이벤트 칩 */}
+                  <div className="space-y-0.5">
+                    {evs.slice(0, 2).map(ev => {
+                      const c = TYPE_COLOR[ev.type] ?? TYPE_COLOR['기타']
+                      return (
+                        <div key={ev.id} className="text-xs px-1 py-0.5 rounded truncate leading-tight"
+                          style={{ backgroundColor: c.bg, color: c.text }}>
+                          {ev.time && <span className="opacity-60 mr-0.5">{ev.time}</span>}
+                          {ev.title}
+                        </div>
+                      )
+                    })}
+                    {evs.length > 2 && (
+                      <div className="text-xs text-gray-400 px-1">+{evs.length - 2}개 더</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── 사이드 패널 ── */}
+        {selected && (
+          <div className="w-68 shrink-0 bg-white border border-gray-200 rounded-xl p-5" style={{ width: 272 }}>
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="font-bold text-gray-800 text-sm leading-snug">
+                {new Date(selected + 'T00:00:00').toLocaleDateString('ko-KR', {
+                  year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                })}
+              </h3>
+              <button onClick={() => { setSelected(null); setShowForm(false) }}
+                className="text-gray-300 hover:text-gray-500 text-xl shrink-0 ml-2">×</button>
+            </div>
+
+            <button onClick={() => setShowForm(v => !v)}
+              className="w-full py-2 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 mb-4 transition-colors font-medium">
+              + 일정 추가
+            </button>
+
+            {showForm && (
+              <form onSubmit={handleSubmit} className="space-y-2.5 mb-4 p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">제목 *</label>
+                  <input required type="text" value={form.title}
+                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="일정 제목"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">종류</label>
+                  <select value={form.type}
+                    onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white">
+                    {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">시간</label>
+                  <input type="time" value={form.time}
+                    onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">참석자</label>
+                  <input type="text" value={form.participants}
+                    onChange={e => setForm(f => ({ ...f, participants: e.target.value }))}
+                    placeholder="예: 민재, 광호"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">내용</label>
+                  <textarea rows={2} value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs resize-none" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-0.5">작성자</label>
+                  <input type="text" value={form.created_by}
+                    onChange={e => setForm(f => ({ ...f, created_by: e.target.value }))}
+                    placeholder="이름"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs" />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setShowForm(false)}
+                    className="flex-1 py-1.5 text-xs border border-gray-300 rounded hover:bg-white">취소</button>
+                  <button type="submit" disabled={saving}
+                    className="flex-1 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">저장</button>
+                </div>
+              </form>
+            )}
+
+            <div className="space-y-2">
+              {dayEvents.length === 0 ? (
+                <p className="text-xs text-gray-300 text-center py-6">등록된 일정이 없습니다</p>
+              ) : dayEvents.map(ev => {
+                const c = TYPE_COLOR[ev.type] ?? TYPE_COLOR['기타']
+                return (
+                  <div key={ev.id} className="rounded-lg p-3 border border-gray-100">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                            style={{ backgroundColor: c.bg, color: c.text }}>{ev.type}</span>
+                          {ev.time && <span className="text-xs text-gray-400">{ev.time}</span>}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 truncate">{ev.title}</p>
+                        {ev.participants && (
+                          <p className="text-xs text-gray-400 mt-0.5">👥 {ev.participants}</p>
+                        )}
+                        {ev.description && (
+                          <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap">{ev.description}</p>
+                        )}
+                        {ev.created_by && (
+                          <p className="text-xs text-gray-300 mt-1">작성: {ev.created_by}</p>
+                        )}
+                      </div>
+                      <button onClick={() => handleDelete(ev.id)}
+                        className="text-gray-200 hover:text-red-400 text-lg leading-none ml-2 shrink-0 transition-colors">×</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {showForm && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-          <h3 className="font-semibold text-gray-700 mb-4">새 미팅 기록</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">날짜 *</label>
-              <input type="date" required value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+      {/* 범례 */}
+      <div className="flex flex-wrap gap-4 mt-4">
+        {EVENT_TYPES.map(t => {
+          const c = TYPE_COLOR[t]
+          return (
+            <div key={t} className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.dot }} />
+              {t}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">발표자</label>
-              <input type="text" value={form.presenter} onChange={e => setForm(f => ({ ...f, presenter: e.target.value }))} placeholder="발표자 이름" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">제목 *</label>
-              <input type="text" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="미팅 주제" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">내용</label>
-              <textarea rows={4} value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} placeholder="미팅 내용을 입력하세요" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">결정 사항</label>
-              <textarea rows={2} value={form.decisions} onChange={e => setForm(f => ({ ...f, decisions: e.target.value }))} placeholder="오늘 결정된 사항" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">다음 미팅 날짜</label>
-              <input type="date" value={form.next_meeting} onChange={e => setForm(f => ({ ...f, next_meeting: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">작성자</label>
-              <input type="text" value={form.created_by} onChange={e => setForm(f => ({ ...f, created_by: e.target.value }))} placeholder="작성자 이름" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-            </div>
-            <div className="col-span-2 flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">취소</button>
-              <button type="submit" disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">저장</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-3">
-        {meetings.length === 0 && <p className="text-gray-400 text-sm py-8 text-center">등록된 미팅 기록이 없습니다.</p>}
-        {meetings.map(m => (
-          <div key={m.id} onClick={() => setSelected(m === selected ? null : m)} className="bg-white border border-gray-200 rounded-xl p-5 cursor-pointer hover:border-blue-300 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-xs text-gray-400">{m.date}</span>
-                {m.presenter && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{m.presenter}</span>}
-                <h3 className="font-semibold text-gray-800 mt-1">{m.title}</h3>
-              </div>
-            </div>
-            {selected?.id === m.id && (
-              <div className="mt-4 space-y-3 text-sm text-gray-600 border-t border-gray-100 pt-4">
-                {m.content && <div><span className="font-medium text-gray-700">내용</span><p className="mt-1 whitespace-pre-wrap">{m.content}</p></div>}
-                {m.decisions && <div><span className="font-medium text-gray-700">결정 사항</span><p className="mt-1 whitespace-pre-wrap">{m.decisions}</p></div>}
-                {m.next_meeting && <div><span className="font-medium text-gray-700">다음 미팅</span><span className="ml-2">{m.next_meeting}</span></div>}
-                {m.created_by && <div className="text-xs text-gray-400">작성: {m.created_by}</div>}
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(m.id) }} className="text-xs text-red-500 hover:text-red-700">삭제</button>
-              </div>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

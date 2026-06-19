@@ -224,7 +224,7 @@ export default function AnnouncementsPage() {
           <textarea
             rows={4}
             value={kakaoText}
-            onChange={e => { setKakaoText(e.target.value); setKakaoError('') }}
+            onChange={e => setKakaoText(e.target.value)}
             placeholder="여기에 복사한 카카오톡 메시지를 붙여넣으세요"
             className="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
           />

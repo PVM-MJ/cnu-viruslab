@@ -17,7 +17,7 @@ export default function DashboardPage() {
         supabase.from('lab_events').select('id', { count: 'exact', head: true })
           .gte('date', `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-01`),
         supabase.from('research_logs').select('id', { count: 'exact', head: true }).eq('date', todayStr),
-        supabase.from('samples').select('id', { count: 'exact', head: true }).neq('stage', 'completed'),
+        supabase.from('samples').select('id', { count: 'exact', head: true }),
         supabase.from('reagents').select('id', { count: 'exact', head: true }),
         supabase.from('research_logs').select('researcher').eq('date', todayStr),
       ])
@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const cards = [
     { href: '/dashboard/meetings', icon: '📅', label: '이번 달 일정', value: `${counts.meetings}건`, color: 'bg-blue-50 border-blue-200' },
     { href: '/dashboard/experiments', icon: '📓', label: '오늘 연구 일지', value: `${counts.logs}건 작성`, color: 'bg-indigo-50 border-indigo-200', sub: todayLoggers.length > 0 ? todayLoggers.join(', ') : '아직 없음' },
-    { href: '/dashboard/samples', icon: '🧪', label: '처리 중 샘플', value: `${counts.samples}개`, color: 'bg-purple-50 border-purple-200' },
+    { href: '/dashboard/samples', icon: '🧪', label: '등록 샘플', value: `${counts.samples}개`, color: 'bg-purple-50 border-purple-200' },
     { href: '/dashboard/reagents', icon: '💊', label: '발주 필요 시약', value: `${counts.needsOrder}개`, color: counts.needsOrder > 0 ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200' },
   ]
 

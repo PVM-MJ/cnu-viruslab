@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { STORAGE_LOCATIONS } from '@/lib/storage-locations'
 import type { Reagent } from '@/lib/types'
 
 const empty = { name: '', quantity: '', unit: 'mL', expiry_date: '', location: '', needs_order: false, notes: '' }
@@ -96,7 +97,12 @@ export default function ReagentsPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">보관 위치</label>
-              <input type="text" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="예: -20℃ 냉동고 2번" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              <select value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="">선택하세요</option>
+                {STORAGE_LOCATIONS.map(l => (
+                  <option key={l.id} value={l.id}>{l.label} ({l.temp})</option>
+                ))}
+              </select>
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">메모</label>

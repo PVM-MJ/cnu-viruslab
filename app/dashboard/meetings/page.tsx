@@ -46,18 +46,23 @@ export default function LabSchedulePage() {
     const monthStart = `${year}-${mm}-01`
     const monthEnd   = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`
 
-    // 이달에 걸치는 이벤트: 시작일 <= 월말 AND (종료일 >= 월초 OR 종료일 없음)
+    // 전달 1일부터 이달 말까지 시작한 이벤트를 가져온 뒤 JS에서 이달 범위 필터
+    const prevYear = month === 0 ? year - 1 : year
+    const prevMM   = String(month === 0 ? 12 : month).padStart(2, '0')
+    const fetchFrom = `${prevYear}-${prevMM}-01`
+
     const { data } = await supabase
       .from('lab_events')
       .select('*')
+      .gte('date', fetchFrom)
       .lte('date', monthEnd)
-      .or(`end_date.gte.${monthStart},end_date.is.null`)
       .order('time', { ascending: true, nullsFirst: true })
 
-    // end_date 없는 이벤트는 시작일이 이달 내여야 함
-    setEvents((data ?? []).filter(ev =>
-      ev.end_date ? true : ev.date >= monthStart
-    ))
+    // 이달에 실제로 겹치는 이벤트만 남김 (end_date 없으면 date 자체가 종료일)
+    setEvents((data ?? []).filter(ev => {
+      const end = ev.end_date ?? ev.date
+      return end >= monthStart
+    }))
   }, [year, month])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])

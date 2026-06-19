@@ -12,6 +12,7 @@ const STORAGE_CHILDREN = [
 
 const topNavItems = [
   { href: '/dashboard', label: '홈', icon: '🏠' },
+  { href: '/dashboard/announcements', label: '공지사항', icon: '📢' },
   { href: '/dashboard/meetings', label: '실험실 일정', icon: '📅' },
   { href: '/dashboard/experiments', label: '연구 일지', icon: '📓' },
 ]

@@ -5,24 +5,23 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
-  const [counts, setCounts] = useState({ meetings: 0, experiments: 0, samples: 0, reagents: 0, needsOrder: 0 })
+  const [counts, setCounts] = useState({ meetings: 0, logs: 0, samples: 0, reagents: 0, needsOrder: 0 })
+  const [todayLoggers, setTodayLoggers] = useState<string[]>([])
 
   useEffect(() => {
     async function fetchCounts() {
-      const [m, e, s, r] = await Promise.all([
+      const todayStr = new Date().toISOString().split('T')[0]
+      const [m, l, s, r, todayLogs] = await Promise.all([
         supabase.from('lab_meetings').select('id', { count: 'exact', head: true }),
-        supabase.from('experiments').select('id', { count: 'exact', head: true }).eq('status', 'in_progress'),
+        supabase.from('research_logs').select('id', { count: 'exact', head: true }).eq('date', todayStr),
         supabase.from('samples').select('id', { count: 'exact', head: true }).neq('stage', 'completed'),
         supabase.from('reagents').select('id', { count: 'exact', head: true }),
+        supabase.from('research_logs').select('researcher').eq('date', todayStr),
       ])
       const { count: needsOrder } = await supabase.from('reagents').select('id', { count: 'exact', head: true }).eq('needs_order', true)
-      setCounts({
-        meetings: m.count ?? 0,
-        experiments: e.count ?? 0,
-        samples: s.count ?? 0,
-        reagents: r.count ?? 0,
-        needsOrder: needsOrder ?? 0,
-      })
+      setCounts({ meetings: m.count ?? 0, logs: l.count ?? 0, samples: s.count ?? 0, reagents: r.count ?? 0, needsOrder: needsOrder ?? 0 })
+      const names = [...new Set((todayLogs.data ?? []).map((r: { researcher: string }) => r.researcher))]
+      setTodayLoggers(names)
     }
     fetchCounts()
   }, [])
@@ -31,7 +30,7 @@ export default function DashboardPage() {
 
   const cards = [
     { href: '/dashboard/meetings', icon: '📋', label: '랩 미팅', value: `총 ${counts.meetings}건`, color: 'bg-blue-50 border-blue-200' },
-    { href: '/dashboard/experiments', icon: '🔬', label: '진행 중 실험', value: `${counts.experiments}개`, color: 'bg-green-50 border-green-200' },
+    { href: '/dashboard/experiments', icon: '📓', label: '오늘 연구 일지', value: `${counts.logs}건 작성`, color: 'bg-indigo-50 border-indigo-200', sub: todayLoggers.length > 0 ? todayLoggers.join(', ') : '아직 없음' },
     { href: '/dashboard/samples', icon: '🧪', label: '처리 중 샘플', value: `${counts.samples}개`, color: 'bg-purple-50 border-purple-200' },
     { href: '/dashboard/reagents', icon: '💊', label: '발주 필요 시약', value: `${counts.needsOrder}개`, color: counts.needsOrder > 0 ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200' },
   ]
@@ -50,6 +49,9 @@ export default function DashboardPage() {
               <div className="text-3xl mb-2">{card.icon}</div>
               <div className="text-sm text-gray-600">{card.label}</div>
               <div className="text-2xl font-bold text-gray-800 mt-1">{card.value}</div>
+              {'sub' in card && card.sub && (
+                <div className="text-xs text-gray-400 mt-1 truncate">{card.sub}</div>
+              )}
             </div>
           </Link>
         ))}
@@ -60,7 +62,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap gap-2">
           {[
             { href: '/dashboard/meetings', label: '+ 랩 미팅 기록' },
-            { href: '/dashboard/experiments', label: '+ 실험 추가' },
+            { href: '/dashboard/experiments', label: '+ 연구 일지 작성' },
             { href: '/dashboard/samples', label: '+ 샘플 등록' },
             { href: '/dashboard/reagents', label: '+ 시약 등록' },
           ].map((item) => (

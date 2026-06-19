@@ -94,7 +94,7 @@ export default function AnnouncementsPage() {
   const [showKakao, setShowKakao] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [kakaoText, setKakaoText] = useState('')
-  const [kakaoError, setKakaoError] = useState('')
+
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -120,14 +120,12 @@ export default function AnnouncementsPage() {
   }
 
   function handleKakaoImport() {
-    const parsed = parseKakaoMessage(kakaoText.trim())
-    if (!parsed) {
-      setKakaoError('형식을 인식하지 못했습니다. 카카오톡에서 메시지를 길게 눌러 "복사"한 텍스트를 그대로 붙여넣어 주세요.')
-      return
-    }
-    setForm({ title: '', content: parsed.content, author: parsed.author })
+    const text = kakaoText.trim()
+    if (!text) return
+    const parsed = parseKakaoMessage(text)
+    // 형식 일치 시 작성자 자동 채움, 아니면 내용만 가져옴
+    setForm({ title: '', content: parsed ? parsed.content : text, author: parsed ? parsed.author : '' })
     setKakaoText('')
-    setKakaoError('')
     setShowKakao(false)
     setShowForm(true)
   }
@@ -200,12 +198,8 @@ export default function AnnouncementsPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-5">
           <p className="text-sm font-semibold text-amber-800 mb-0.5">💬 카카오톡 메시지 붙여넣기</p>
           <p className="text-xs text-amber-600 mb-3">
-            단톡방에서 메시지를 <strong>길게 눌러 복사</strong>한 뒤 아래에 붙여넣으세요.
-            <br />
-            <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">
-              [교수님] [오전 10:30] 이번 주 목요일 랩미팅...
-            </span>
-            형식이 자동 파싱됩니다.
+            단톡방에서 메시지를 <strong>길게 눌러 복사</strong>한 뒤 아래에 붙여넣으세요.<br />
+            내용이 자동으로 채워지고, 작성자는 직접 입력하면 됩니다.
           </p>
           <textarea
             rows={4}
@@ -214,12 +208,10 @@ export default function AnnouncementsPage() {
             placeholder="여기에 복사한 카카오톡 메시지를 붙여넣으세요"
             className="w-full px-3 py-2.5 border border-amber-300 rounded-lg text-sm bg-white resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
-          {kakaoError && (
-            <p className="text-xs text-red-500 mt-1.5">{kakaoError}</p>
-          )}
+
           <div className="flex gap-2 mt-3">
             <button
-              onClick={() => { setShowKakao(false); setKakaoText(''); setKakaoError('') }}
+              onClick={() => { setShowKakao(false); setKakaoText('') }}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
             >
               취소

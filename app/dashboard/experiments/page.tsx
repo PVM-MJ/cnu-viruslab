@@ -18,6 +18,22 @@ const LAB_MEMBERS = ['광호', '예연', '지민', '민재', '주호']
 const today = new Date().toISOString().split('T')[0]
 const EMPTY_FORM = { date: today, projects: '', content: '', results: '', next_plan: '' }
 
+function getWeekStart(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const dow = date.getDay()
+  date.setDate(date.getDate() + (dow === 0 ? -6 : 1 - dow))
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function getWeekLabel(monday: string): string {
+  const [y, m, d] = monday.split('-').map(Number)
+  const mon = new Date(y, m - 1, d)
+  const sun = new Date(y, m - 1, d + 6)
+  const fmt = (dt: Date) => `${dt.getMonth() + 1}/${dt.getDate()}`
+  return `${mon.getFullYear()}년 ${fmt(mon)} ~ ${fmt(sun)}`
+}
+
 export default function ResearchLogPage() {
   const [myName, setMyName] = useState<string | null>(null)
   const [nameInput, setNameInput] = useState('')
@@ -27,6 +43,7 @@ export default function ResearchLogPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const [openWeeks, setOpenWeeks] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(EMPTY_FORM)
   const [updating, setUpdating] = useState(false)
@@ -277,18 +294,29 @@ export default function ResearchLogPage() {
       )}
 
       {/* 기록 목록 */}
-      <div className="space-y-3">
-        {logs.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <div className="text-4xl mb-3">📝</div>
-            <p className="text-sm">아직 기록이 없습니다.</p>
-            {activeTab === myName && (
-              <p className="text-xs mt-1">위 버튼을 눌러 첫 기록을 남겨보세요.</p>
-            )}
-          </div>
-        )}
+      {(() => {
+        const currentWeekStart = getWeekStart(today)
+        const currentLogs = logs.filter(l => l.date >= currentWeekStart)
+        const pastLogs = logs.filter(l => l.date < currentWeekStart)
 
-        {logs.map(log => (
+        // 지난 주들을 주 시작일 기준으로 그룹화 (최신순)
+        const weekMap: Record<string, ResearchLog[]> = {}
+        for (const log of pastLogs) {
+          const ws = getWeekStart(log.date)
+          if (!weekMap[ws]) weekMap[ws] = []
+          weekMap[ws].push(log)
+        }
+        const pastWeeks = Object.keys(weekMap).sort((a, b) => b.localeCompare(a))
+
+        function toggleWeek(ws: string) {
+          setOpenWeeks(prev => {
+            const next = new Set(prev)
+            next.has(ws) ? next.delete(ws) : next.add(ws)
+            return next
+          })
+        }
+
+        function renderCard(log: ResearchLog) { return (
           <div key={log.id}
             className="bg-white border border-gray-200 rounded-xl p-5 transition-colors hover:border-blue-200">
 
@@ -426,8 +454,62 @@ export default function ResearchLogPage() {
               </>
             )}
           </div>
-        ))}
-      </div>
+        )}
+
+        return (
+          <div className="space-y-3">
+            {logs.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-4xl mb-3">📝</div>
+                <p className="text-sm">아직 기록이 없습니다.</p>
+                {activeTab === myName && (
+                  <p className="text-xs mt-1">위 버튼을 눌러 첫 기록을 남겨보세요.</p>
+                )}
+              </div>
+            )}
+
+            {/* 이번 주 기록 */}
+            {currentLogs.map(log => renderCard(log))}
+
+            {/* 지난 주 폴더 */}
+            {pastWeeks.length > 0 && (
+              <div className="space-y-2 pt-2">
+                {currentLogs.length > 0 && (
+                  <div className="flex items-center gap-2 py-1">
+                    <div className="flex-1 border-t border-gray-200" />
+                    <span className="text-xs text-gray-400">이전 기록</span>
+                    <div className="flex-1 border-t border-gray-200" />
+                  </div>
+                )}
+                {pastWeeks.map(ws => {
+                  const isOpen = openWeeks.has(ws)
+                  const weekLogs = weekMap[ws]
+                  return (
+                    <div key={ws}>
+                      <button
+                        onClick={() => toggleWeek(ws)}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-left"
+                      >
+                        <span className="text-base">📁</span>
+                        <span className="text-sm font-medium text-gray-700">{getWeekLabel(ws)}</span>
+                        <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">
+                          {weekLogs.length}개
+                        </span>
+                        <span className={`ml-auto text-gray-400 transition-transform text-sm ${isOpen ? 'rotate-90' : ''}`}>›</span>
+                      </button>
+                      {isOpen && (
+                        <div className="mt-2 ml-4 pl-3 border-l-2 border-gray-200 space-y-2">
+                          {weekLogs.map(log => renderCard(log))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

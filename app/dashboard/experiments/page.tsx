@@ -27,6 +27,9 @@ export default function ResearchLogPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState(EMPTY_FORM)
+  const [updating, setUpdating] = useState(false)
   const [aiLoading, setAiLoading] = useState<string | null>(null)
   const [aiResult, setAiResult] = useState<{ id: string; korean: string; english: string } | null>(null)
 
@@ -104,6 +107,34 @@ export default function ResearchLogPage() {
     if (!confirm('삭제하시겠습니까?')) return
     await supabase.from('research_logs').delete().eq('id', id)
     setSelected(null)
+    if (activeTab) fetchLogs(activeTab)
+  }
+
+  function startEdit(log: ResearchLog) {
+    setEditingId(log.id)
+    setEditForm({
+      date: log.date,
+      projects: log.projects ?? '',
+      content: log.content,
+      results: log.results ?? '',
+      next_plan: log.next_plan ?? '',
+    })
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingId) return
+    setUpdating(true)
+    const { error } = await supabase.from('research_logs').update({
+      date: editForm.date,
+      projects: editForm.projects || null,
+      content: editForm.content,
+      results: editForm.results || null,
+      next_plan: editForm.next_plan || null,
+    }).eq('id', editingId)
+    setUpdating(false)
+    if (error) { alert('수정 실패: ' + error.message); return }
+    setEditingId(null)
     if (activeTab) fetchLogs(activeTab)
   }
 
@@ -259,85 +290,140 @@ export default function ResearchLogPage() {
 
         {logs.map(log => (
           <div key={log.id}
-            onClick={() => setSelected(selected === log.id ? null : log.id)}
-            className="bg-white border border-gray-200 rounded-xl p-5 cursor-pointer hover:border-blue-200 transition-colors">
+            className="bg-white border border-gray-200 rounded-xl p-5 transition-colors hover:border-blue-200">
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-700">{log.date}</span>
-              <span className="text-xs text-gray-400">
-                {new Date(log.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 작성
-              </span>
-            </div>
-
-            <p className="text-sm text-gray-600 mt-2 leading-relaxed line-clamp-2">{log.content}</p>
-
-            {selected === log.id && (
-              <div className="mt-4 space-y-4 border-t border-gray-100 pt-4 text-sm">
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">오늘 한 일</p>
-                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.content}</p>
+            {/* 편집 모드 */}
+            {editingId === log.id ? (
+              <form onSubmit={handleUpdate} onClick={e => e.stopPropagation()} className="space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-semibold text-gray-700">기록 수정</p>
+                  <button type="button" onClick={() => setEditingId(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600">취소</button>
                 </div>
-                {log.results && (
+                <div className="flex gap-3">
                   <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">결과 / 관찰</p>
-                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.results}</p>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">날짜 *</label>
+                    <input type="date" required value={editForm.date}
+                      onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
-                )}
-                {log.next_plan && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">다음 계획</p>
-                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.next_plan}</p>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">관련 프로젝트</label>
+                    <input type="text" value={editForm.projects}
+                      onChange={e => setEditForm(f => ({ ...f, projects: e.target.value }))}
+                      placeholder="예: Curdlan, TSWV (쉼표로 구분)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
-                )}
-                {/* AI 정리 버튼 */}
-                <div className="pt-2 border-t border-gray-100">
-                  <button
-                    onClick={e => { e.stopPropagation(); handleAI(log) }}
-                    disabled={aiLoading === log.id}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors font-medium"
-                  >
-                    {aiLoading === log.id
-                      ? <><span className="animate-spin inline-block">⟳</span> AI 정리 중…</>
-                      : <>✨ AI 정리 · 영문 요약</>}
+                </div>
+                {[
+                  { key: 'content', label: '한 일 *', placeholder: '수행한 실험 및 연구 내용', required: true, rows: 4 },
+                  { key: 'results', label: '결과 / 관찰', placeholder: '실험 결과나 관찰 내용', required: false, rows: 3 },
+                  { key: 'next_plan', label: '다음 계획', placeholder: '다음에 할 일', required: false, rows: 2 },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                    <textarea required={f.required} rows={f.rows}
+                      value={editForm[f.key as keyof typeof editForm]}
+                      onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                ))}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setEditingId(null)}
+                    className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">취소</button>
+                  <button type="submit" disabled={updating}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {updating ? '저장 중…' : '저장'}
                   </button>
                 </div>
+              </form>
+            ) : (
+              /* 보기 모드 */
+              <>
+                <div className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setSelected(selected === log.id ? null : log.id)}>
+                  <span className="text-sm font-bold text-gray-700">{log.date}</span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(log.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 작성
+                  </span>
+                </div>
 
-                {/* AI 결과 패널 */}
-                {aiResult?.id === log.id && (
-                  <div onClick={e => e.stopPropagation()} className="mt-3 rounded-xl overflow-hidden border border-purple-100">
-                    {/* 한국어 정리 */}
-                    <div className="bg-purple-50 px-4 py-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-purple-700">✦ 정리된 내용 (KO)</p>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(aiResult.korean)}
-                          className="text-xs text-purple-400 hover:text-purple-600"
-                        >복사</button>
-                      </div>
-                      <p className="text-xs text-purple-900 whitespace-pre-wrap leading-relaxed">{aiResult.korean}</p>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed line-clamp-2 cursor-pointer"
+                  onClick={() => setSelected(selected === log.id ? null : log.id)}>
+                  {log.content}
+                </p>
+
+                {selected === log.id && (
+                  <div className="mt-4 space-y-4 border-t border-gray-100 pt-4 text-sm">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">한 일</p>
+                      <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.content}</p>
                     </div>
-                    {/* 영문 요약 */}
-                    <div className="bg-indigo-50 px-4 py-3 border-t border-purple-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-indigo-700">✦ English Summary</p>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(aiResult.english)}
-                          className="text-xs text-indigo-400 hover:text-indigo-600"
-                        >Copy</button>
+                    {log.results && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">결과 / 관찰</p>
+                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.results}</p>
                       </div>
-                      <p className="text-xs text-indigo-900 whitespace-pre-wrap leading-relaxed">{aiResult.english}</p>
+                    )}
+                    {log.next_plan && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1.5">다음 계획</p>
+                        <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{log.next_plan}</p>
+                      </div>
+                    )}
+                    {/* AI 정리 버튼 */}
+                    <div className="pt-2 border-t border-gray-100">
+                      <button
+                        onClick={e => { e.stopPropagation(); handleAI(log) }}
+                        disabled={aiLoading === log.id}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors font-medium"
+                      >
+                        {aiLoading === log.id
+                          ? <><span className="animate-spin inline-block">⟳</span> AI 정리 중…</>
+                          : <>✨ AI 정리 · 영문 요약</>}
+                      </button>
                     </div>
+
+                    {/* AI 결과 패널 */}
+                    {aiResult?.id === log.id && (
+                      <div className="mt-3 rounded-xl overflow-hidden border border-purple-100">
+                        <div className="bg-purple-50 px-4 py-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-purple-700">✦ 정리된 내용 (KO)</p>
+                            <button onClick={() => navigator.clipboard.writeText(aiResult.korean)}
+                              className="text-xs text-purple-400 hover:text-purple-600">복사</button>
+                          </div>
+                          <p className="text-xs text-purple-900 whitespace-pre-wrap leading-relaxed">{aiResult.korean}</p>
+                        </div>
+                        <div className="bg-indigo-50 px-4 py-3 border-t border-purple-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-indigo-700">✦ English Summary</p>
+                            <button onClick={() => navigator.clipboard.writeText(aiResult.english)}
+                              className="text-xs text-indigo-400 hover:text-indigo-600">Copy</button>
+                          </div>
+                          <p className="text-xs text-indigo-900 whitespace-pre-wrap leading-relaxed">{aiResult.english}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === myName && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={e => { e.stopPropagation(); startEdit(log) }}
+                          className="text-xs text-blue-500 hover:text-blue-700">
+                          수정
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDelete(log.id) }}
+                          className="text-xs text-red-400 hover:text-red-600">
+                          삭제
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
-
-                {activeTab === myName && (
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDelete(log.id) }}
-                    className="text-xs text-red-400 hover:text-red-600">
-                    삭제
-                  </button>
-                )}
-              </div>
+              </>
             )}
           </div>
         ))}

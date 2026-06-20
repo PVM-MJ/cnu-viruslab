@@ -17,6 +17,7 @@ const topNavItems = [
   { href: '/dashboard/experiments', label: '연구 일지', icon: '📓' },
   { href: '/dashboard/research-notes', label: '연구 노트', icon: '🔬' },
   { href: '/dashboard/protocols', label: '공용 프로토콜', icon: '📋' },
+  { href: '/dashboard/weekly-report', label: '위클리 리포트', icon: '📄' },
 ]
 
 const bottomNavItems = [
@@ -52,7 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col print:hidden">
         <div className="p-5 border-b border-gray-200">
           <div className="text-2xl mb-1">🌿</div>
           <h1 className="text-sm font-bold text-gray-800 leading-tight">CNU 식물바이러스<br />연구실</h1>
@@ -99,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 p-8 overflow-auto print:p-0">
         {children}
       </main>
     </div>

@@ -7,6 +7,7 @@ interface ResearchLog {
   id: string
   researcher: string
   date: string
+  projects: string | null
   content: string
   results: string | null
   next_plan: string | null
@@ -15,7 +16,7 @@ interface ResearchLog {
 
 const LAB_MEMBERS = ['광호', '예연', '지민', '민재', '주호']
 const today = new Date().toISOString().split('T')[0]
-const EMPTY_FORM = { date: today, content: '', results: '', next_plan: '' }
+const EMPTY_FORM = { date: today, projects: '', content: '', results: '', next_plan: '' }
 
 export default function ResearchLogPage() {
   const [myName, setMyName] = useState<string | null>(null)
@@ -68,6 +69,7 @@ export default function ResearchLogPage() {
     const { error } = await supabase.from('research_logs').insert([{
       researcher: activeTab,
       date: form.date,
+      projects: form.projects || null,
       content: form.content,
       results: form.results || null,
       next_plan: form.next_plan || null,
@@ -199,6 +201,14 @@ export default function ResearchLogPage() {
               <input type="date" required value={form.date}
                 onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">관련 프로젝트</label>
+              <input type="text" value={form.projects}
+                onChange={e => setForm(f => ({ ...f, projects: e.target.value }))}
+                placeholder="예: Curdlan, TSWV, dsRNA review paper (쉼표로 구분)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <p className="text-xs text-gray-400 mt-0.5">위클리 리포트 Projects 열에 표시됩니다</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">오늘 한 일 *</label>

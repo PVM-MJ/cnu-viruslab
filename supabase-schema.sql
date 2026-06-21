@@ -52,8 +52,22 @@ create table reagents (
   updated_at timestamptz default now()
 );
 
+-- 공용 프로토콜
+create table protocols (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  category text not null check (category in ('wet', 'dry')),
+  subtitle text,
+  content text not null,
+  created_by text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- RLS 비활성화 (앱 레벨에서 비밀번호로 접근 제어)
 alter table lab_meetings disable row level security;
 alter table experiments disable row level security;
 alter table samples disable row level security;
 alter table reagents disable row level security;
+alter table protocols disable row level security;
+grant all privileges on table protocols to anon;

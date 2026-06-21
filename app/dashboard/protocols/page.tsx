@@ -39,16 +39,17 @@ export default function ProtocolsPage() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await supabase.from('protocols').insert([{
+    const { error } = await supabase.from('protocols').insert([{
       title:      form.title,
       category:   tab as ProtocolCategory,
       subtitle:   form.subtitle || null,
       content:    form.content,
       created_by: form.created_by || null,
     }])
+    setSaving(false)
+    if (error) { alert('저장 실패: ' + error.message); return }
     setForm(EMPTY_FORM)
     setShowForm(false)
-    setSaving(false)
     fetchProtocols()
   }
 
@@ -73,15 +74,16 @@ export default function ProtocolsPage() {
     e.preventDefault()
     if (!editing) return
     setSaving(true)
-    await supabase.from('protocols').update({
+    const { error } = await supabase.from('protocols').update({
       title:      editForm.title,
       subtitle:   editForm.subtitle || null,
       content:    editForm.content,
       created_by: editForm.created_by || null,
       updated_at: new Date().toISOString(),
     }).eq('id', editing.id)
-    setEditing(null)
     setSaving(false)
+    if (error) { alert('수정 실패: ' + error.message); return }
+    setEditing(null)
     fetchProtocols()
   }
 

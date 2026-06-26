@@ -22,6 +22,7 @@ const topNavItems = [
 
 const bottomNavItems = [
   { href: '/dashboard/plantroom', label: '식물방 도면', icon: '🌱' },
+  { href: '/dashboard/lunch', label: '오늘 뭐 먹지?', icon: '🍽️' },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

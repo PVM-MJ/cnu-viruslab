@@ -114,7 +114,7 @@ export default function PlantRoomPage() {
       <div>
         {/* SVG Floor Plan */}
         <div className="bg-white border border-gray-200 rounded-xl p-3 overflow-x-auto mb-4">
-          <svg viewBox="0 0 800 600" className="w-full">
+          <svg viewBox="0 0 800 600" className="w-full" style={{ maxHeight: '160px' }}>
             {/* Room background — 790×578 */}
             <rect x={5} y={5} width={790} height={578} fill="#F8FAFC" stroke="#374151" strokeWidth={2} rx={2} />
 
